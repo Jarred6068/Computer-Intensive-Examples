@@ -1,0 +1,858 @@
+---
+title: 'Sequence Motif Discovery'
+subtitle: 'STAT 565 Project '
+author: "Jarred Kvamme"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+fontsize: 9pt
+bibliography: fivesixfiverf.bib  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+```
+
+\section*{Introduction}
+
+\indent Sequence motif discovery (SMD) is an application of data mining methods in bioinformatics in which researchers aim to extract highly conserved sequence segments called regulatory motifs found in genetic and protein sequences [@d2006does]. Typically, a set of unaligned sequences, such as suspected regulatory regions of co-regulated genes, are analyzed for short (6-20 bps long) sub-sequence patterns they have in common. There exists a wide range of pattern-recognition tools to approach this problem such as enumeration, information content analysis, and optimization [@d2006does; @tompa2005assessing]. 
+
+\indent Expectation-Maximization (EM) is a common method for solving optimization problems that involve missing data by maximizing the log-likelihood of the observed data component. Thus the EM method fits comfortably into SMD where the structure that generates patterns in such sequences is not directly observable [@lawrence1990expectation; @gentle2009computational]. In the case of SMD, the EM method treats the motif(s) as a set of coding segments with unknown positions within a larger matrix of sequences.    
+
+\subsection*{Method}
+
+\indent Given an initializing matrix of probabilities for the positions within the motif (sites), and a vector of probabilities for the frequencies of the residues outside of the motif (non-sites or NS), the algorithm initiates by first calculating the probability of each sequence conditioned on each element in the sequence being the starting location of the motif. The expected frequencies of each site and non-site position are then calculated as a average of the residue count weighted by the probability that the $(k,l)^{th}$ element is the starting position of the motif. The algorithm proceeds recursively between calculating the expected counts and then using them to update the parameters with their maximum likelihood estimates (MLE) [@lawrence1990expectation; @fan2010algorithm]. See algorithm 1 in the appendix for more detail
+
+\indent The weight-matrix ${\bf\Theta}$ parameterizes the motif such that the distribution of residues at each position within the motif follow a multinomial distribution [@liu1995bayesian; @stormo1989identifying]. The residues that do not belong to the motif follow the distribution parameterized by the vector ${\bf\theta_0}$ independent of the motif. To demonstrate the use of the most basic application of the EM, I assume a mononucleic genetic model on a set of sequences which each contain only a single site and the site starting positions are uniformly probable. The data consists of a matrix  ${\bf Y}$ with $K$ sequences of length $L$, each of which contains a single motif of length $w$, such that $Y_{k,l}$ is the $l^{th}$ element in the $k^{th}$ sequence and $\Gamma_{k,l}=1$ if the $(l,k)^{th}$ element is the starting position of a motif under the constraints:
+
+\[ P(\Gamma_{k,l}=1) = \frac{1}{L'_k} \ \text{and} \ \sum_l \Gamma_{k,l} = 1 \]
+
+The likelihood of the complete data model is:
+
+\[ P({\bf Y,\Gamma}|{\bf \Theta}) = {\bf\theta_0}^{h({\bf B_{\Gamma}})} \prod_{i=1}^w {\bf\theta}_i^{h({\bf M_{\Gamma}^{(i)}})}\]
+
+where ${\bf B_{\Gamma}}$ is the set of all non-site bases in the matrix ${\bf Y}$, ${\bf M_{\Gamma}^{(i)}}$ is the set of bases at position $i$ in the motif, and $h(\cdot)$ is the counting function which takes in a set of letter-symbols representative of the residues and outputs a vector of their relative frequencies (see Appendix). In the \textbf{E-step} the algorithm calculates the vector of probabilities for each possible position being the motif starting location given the current parameters:
+
+\[ w_{k,l}^{(t)} = P(Y_k|\Gamma_{k,l}=1,\Theta^{(t)}) \]
+
+and the expected counts of the site and non-site bases
+
+\[ E_{\ \Gamma|Y,\Theta^{(t)}}\left[h({\bf M_{\Gamma}^{(i)}})\right] \ \text{and} \ \ E_{\ \Gamma|Y,\Theta^{(t)}}\left[ h({\bf B_{\Gamma}} )\right] \]
+
+and then updates the parameter matrix $\Theta$ with the observed proportions of residues in both site and non-site segments
+
+\[ {\bf\theta_i}^{(t+1)} =  \frac{ E_{\ \Gamma|Y,\Theta^{(t)}}\left[h({\bf M_{\Gamma}^{(i)}})\right] }{K} \ \ \text{and} \ \ {\bf\theta_0}^{(t+1)} = \frac{E_{\ \Gamma|Y,\Theta^{(t)}}\left[ {\bf B_{\Gamma}} \right]}{\sum_{k=1}^{K} L_k-w} \]
+
+\indent To analyze the performance of the algorithm, it was tested on randomly generated sequence data to observe the convergence properties of non-site parameters. In this scenario, the true sites are unknown to the researcher so the predicted probabilities of sites are novel. To further analyze the predictive capabilities of the model, it was tested against a set of CRP binding sites from 23 loci in the \textit{E. coli} genome. Each CRP site was randomly positioned in a 95 bp sequence simulated using some arbitrary NS frequencies similar to @lawrence1990expectation and @stormo1989identifying (Table 3).
+
+\section*{Results}
+
+\indent At convergence the algorithm provides the maximum likelihood parameter estimates for site and non-site residue distributions as well as a matrix of posterior probabilities for motif locations [@fan2010algorithm; @lawrence1990expectation]. Tables 1 and 2 display the results of the algorithm for randomly generated data in which there are no actual sites. The performance can still be assessed as the true NS-frequencies used to generate the model are well estimated at convergence (Figure 1). The algorithm was also tested against the CRP data given in Table 3. The true and predicted parameters and starting positions are given in Tables 4, 5 and Figure 2. A paired Mann–Whitney $U$ test was performed on the positions and yielded a significant difference in the location of the true and predicted motif starting positions (U=42, p=0.003445). However, $50\%$ of the predictions were within 4 bp of the true starting positions (usually upstream) and $65.2\%$ of the predictions occurred inside the 19bp boundary of the CRP sites. 
+
+\section*{Discussion}
+
+\indent I specifically chose this model to gain experience in statistical applications to genetic/biological problems. The single motif, mononucleotide model represents the simplest example of the EM algorithm's use in SMD [@stormo1989identifying]. Modifications to the algorithm that incorporate binding structure, multiple motif sites, and orientation preference can greatly increase the flexibility/performance of the model [ @fan2010algorithm; @lawrence1990expectation; @tompa2005assessing]. Arguably, the most popular implementation is the Multiple EM for Motif Elicitation
+(MEME) algorithm which utilizes a two-component finite mixture model and a set of positional prior probabilities on the sequences to tackle the latter two modifications [@bailey1994fitting]. 
+
+\indent In the context of this simple model, its performance is critically limited by the starting information provided in the initialization step. From the reported values, we can see that the estimates are prone to entrapment by local maxima [@d2006does]. The algorithm also suffers from boundary issues limiting the length of sequences that can be handled (in the single motif context).
+
+
+
+
+
+
+
+
+
+
+\newpage
+\section*{Appendix}
+
+\subsection*{Model Details:}
+Given a matrix of sequences ${\bf Y}$ with $K$ sequences of length $L$, each of which contains a single motif of length $w$, such that $Y_{k,l}$ is the $l^{th}$ element in the $k^{th}$ sequence, the model for the unobserved data are the motif starting positions:
+
+\[ \Gamma_{k,l} = \begin{cases} 1 &\ \text{if the motif starts at the $l^{th}$ position } \\
+                                0 & \ \text{else}
+\end{cases} \]
+
+where
+
+\[ P(\Gamma_{k,l}=1) = \frac{1}{L'_k} \ \text{and} \ \sum_l \Gamma_{k,l} = 1 \]
+
+\[ \text{for} \  \{1\leq k \leq K; 1\leq l\leq L'\} \ \text{and} \ L' = L-w+1 \ \text{possible starting positions} \]
+
+  if the $l^{th}$ position of a the matrix ${\bf Y}$ is part of a motif with $i \in [1:w]$ possible positions, then it follows a multinomial distribution with parameter vector ${\bf\theta_i}$, else it follows the probability vector ${\bf\theta_0}$ for non-motif residues. The probability vector ${\bf\theta_i}$ has length equal to the number of unique residues $d$ possible in the sequence such that ${\bf\theta_i} = \{p_1, p_2, ... p_d \}$ and $d=4$ in the genetic model. Let $\Theta = \{{\bf\theta_0}, {\bf\theta_1}, . . . {\bf\theta_w} \}$ and we must define the function:
+  
+  \[h(Y_k) = \left\{  \sum_l I(Y_{k,l} = r_1), \sum_l I(Y_{k,l} = r_2), . . . \sum_l I(Y_{k,l} = r_d)\right\} = \{n_1, n_2, ...,n_d\} \]
+
+for the set of letter symbols $\in {r_1, ... r_d}$ and their respective counts $\{n_1, n_2, ...,n_d\}$ on $d$ residues. We have then the vector-power function as:
+
+\[ {\bf\theta_i}^{h(\cdot)} = \prod_{j=1}^d \theta_{i,j}^{n_j} \ \ \ \ \text{for} \ i\in [0:w] \]
+
+we can then write the probability of observing the sequence $Y_k$ conditioned on the $(l,k)^{th}$ position being the motif starting location as:
+
+\[P(Y_k | \Gamma_{k,l}=1, \Theta) =\left( \prod_{i=1}^d p_{i,0}^{n_i} \right) \prod_{j=1}^w\prod_{i=1}^d p_{i,j}^{n_j}  \]
+\[  = {\bf\theta_0}^{h(\bf B_{k,l})} \prod_{j=1}^w {\bf\theta_i}^{h(Y_{k, l+j-1})}\]
+
+  
+where ${\bf B_{k,l}}$ is the set of all non-site nucleotide bases in sequence $Y_k$. The complete data likelihood then becomes $K$-product of the above to yield:
+
+\[  = {\bf\theta_0}^{h({\bf B_{\Gamma}})} \prod_{j=1}^w {\bf\theta_i}^{h({\bf M_{\Gamma}^{(i)}})}\]
+
+where ${\bf B_{\Gamma}}$ is the set of all non-site bases in the matrix ${\bf Y}$ and ${\bf M_{\Gamma}^{(i)}}$ is the set of bases at position $i$ in the motif. 
+
+\subsection*{Algorithm}
+
+\textbf{(1)} initialize parameters $\Theta_0$   
+
+\textbf{(2)} recursion: $t\in 1:T$ iterations
+
+\indent \textbf{(2.1) E-step} calculate the probability of each position being the motif starting location:
+\[ w_{k,l}^{(t)} = P(Y_k|\Gamma_{k,l}=1,\Theta^{(t)}) \]
+\[ w_{k,l}^{(t)} = \left(\frac{ {\bf\theta_1}^{(t)} }{ {\bf\theta_0}^{(t)} }\right)^{h(Y_{k,l})} \times ... \left(\frac{ {\bf\theta_w}^{(t)} }{ {\bf\theta_0}^{(t)} }\right)^{h(Y_{k,l+w-1})} \times \left({\bf\theta_0}^{(t)}\right)^{h(Y_k)} \]
+\[W_k^{(t)} = \sum_{l=1}^{L_k'} w_{k,l}^{(t)} \]
+\indent calculate the expected counts for site and non-sites conditional to the above:
+\[E_{\ \Gamma|Y,\Theta^{(t)}}\left[h({\bf M_{\Gamma}^{(i)}})\right] = \sum_{k=1}^K \sum_{l=1}^{L_k'} \frac{ w_{k,l}^{(t)} }{ W_k^{(t)} } h(Y_{k, l+i-1}) \ \text{for} \ i\in[1:w] \]
+
+\[E_{\ \Gamma|Y,\Theta^{(t)}}\left[ {h(\bf B_{\Gamma}} )\right] = h(Y_{k,l}: {1\leq k \leq K, 1\leq l\leq L_k}) - \sum_{i=1}^w E_{\ \Gamma|Y,\Theta^{(t)}}\left[h({\bf M_{\Gamma}^{(i)}})\right]  \]
+
+\indent \textbf{(2.2) M-step} calculate the relative proportions using the expected counts:
+
+\[ {\bf\theta_i}^{(t+1)} =  \frac{ E_{\ \Gamma|Y,\Theta^{(t)}}\left[h({\bf M_{\Gamma}^{(i)}})\right] }{K}\]
+
+\[ {\bf\theta_0}^{(t+1)} = \frac{E_{\ \Gamma|Y,\Theta^{(t)}}\left[ {\bf B_{\Gamma}} \right]}{\sum_{k=1}^{K} L_k-w} \]
+
+\indent \textbf{(3)} return parameter estimates and posterior motif location probabilities matrix at convergence
+
+\[\textbf{return:} \ \Theta^T, W^T\]
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+#subsidiary functions:
+
+#generate "genomic" sequences
+#========================function===================================
+gen.seq=function(seq.length=1000, uniform.probs=TRUE, seq.probs=NULL, K=NULL, seed=567){
+  
+  p=seq.probs   #cumuluative probabilities 
+  gene.seq=NULL
+  gene.mat=as.data.frame(matrix(0, nrow = K, ncol = seq.length))
+  colnames(gene.mat)=c(1:seq.length)
+  
+  set.seed(seed)
+  
+  for(k in 1:K){  
+
+    if(uniform.probs==TRUE){
+  
+      for(i in 1:seq.length){
+        r=runif(1, 0, 1)
+  
+        if(r<=0.25){gene.seq[i] = "A"}
+        if(r>0.25 & r<=0.5){gene.seq[i] ="T"}
+        if(r>0.5 & r<=0.75){gene.seq[i] = "C"}
+        if(r>0.75){gene.seq[i] = "G"}
+  
+     }
+    
+
+    }else{
+    
+      for(i in 1:seq.length){
+        r=runif(1, 0, 1)
+      
+        if(r<=p[1]){gene.seq[i] = "A"}
+        if(r>p[1] & r<=p[2]){gene.seq[i] ="T"}
+        if(r>p[2] & r<= p[3]){gene.seq[i] = "C"}
+        if(r>p[3]){gene.seq[i] = "G"}
+    
+      }
+    
+    
+    }
+    
+    gene.mat[k, ]=gene.seq
+    
+    
+  }
+  
+
+  return(gene.mat)
+
+}
+#===================================================================
+
+#counting function that can take on sequence vectors
+#=========================function==================================
+h=function(seq=NULL){
+  
+  countA=sum(ifelse(seq=="A", 1, 0))
+  countT=sum(ifelse(seq=="T", 1, 0))
+  countC=sum(ifelse(seq=="C", 1, 0))
+  countG=sum(ifelse(seq=="G", 1, 0))
+  counts=c(countA, countT, countC, countG)
+  return(counts)
+}
+#===================================================================
+
+#counting function that can take on single positions of a sequence
+#=========================function==================================
+h2=function(element=NULL){
+  bases=c("A","T","C","G")
+  C=NULL
+  
+    C=ifelse(element==bases, 1, 0)
+  
+  
+  return(C)
+}
+#===================================================================
+
+
+
+#calculate the probability the motif starts at position i'th 
+#=========================function==================================
+calc.prob.w=function(genome.seq=NULL, motif.len=NULL, prob.mat=NULL){
+  #initialization
+  idx=dim(genome.seq)
+  K=idx[1]
+  l=idx[2]
+  L.prime=l-motif.len+1
+  theta.0=prob.mat[,1]
+  theta.all=prob.mat[,2:(motif.len+1)]
+  
+  prob.matrix=as.data.frame(matrix(0, nrow = K, ncol = L.prime))
+  
+  w.k.l=NULL
+  
+  scaled.probs=theta.all/theta.0
+  
+  for(k in 1:K){
+    
+    theta.yk0=prod(theta.0^h(genome.seq[k,]))
+    
+    for(i in 1:L.prime){
+      p.w=NULL
+      
+      for(j in 1:motif.len){ 
+        p.w[j]=prod( scaled.probs[,j]^h2(genome.seq[k,(i+j-1)]) ) 
+      }
+      #print(p.w)
+      
+      P=prod(p.w)
+      
+      
+      #print(p.w)
+      w.k.l[i]=as.numeric(theta.yk0*P)
+      
+    }
+    
+    prob.matrix[k,]=w.k.l
+    
+  }
+  
+  
+  
+  return(prob.matrix)
+  
+  
+}
+
+#===================================================================
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+#EM algorithm for Sequence Motif Discovery (SMD) in sequence with single motif/ transcription factor binding site 
+#SYNTAX:
+
+#gene.mat -- a matrix of the character vectors for K nucleotide sequences of values "A", "T", "C", "G"
+
+#start.prob.mat -- a matrix with K rows and w+1 columns in which the first column is a vector of 
+#starting probabilities for non-site (NS) bases and the remaining w columns are probabilties for the 
+#i'th position of the motif
+
+#motif.len -- the value of w
+
+
+SMD.EM=function(gene.mat=NULL, start.prob.mat=NULL, motif.len=NULL, verbose=TRUE, conv.cond=0.0005){
+#initialize
+  genome1=gene.mat
+  theta.all=start.prob.mat
+  w=motif.len
+  #setting indicies
+  L.prime=dim(genome1)[2]-w+1
+  K=dim(genome1)[1]
+  
+  steps.to.converge=NULL
+  q=1
+  parameter.mat=list()
+  #intial test value
+  test=1
+  
+  while(test>conv.cond){
+    theta.0.old=theta.all[,1]
+    
+#==============================EM======================================
+#_____________________________E-step___________________________________
+#function to calculate start location probabilities
+w.kl.mat=calc.prob.w(genome1, w, theta.all) 
+W.K=apply(w.kl.mat, 1, sum)
+#space allocation
+var1=as.data.frame(matrix(0, nrow = L.prime, ncol = 4))
+var2=as.data.frame((matrix(0, nrow = K, ncol = 4)))
+Expected.Mgamma=as.data.frame(matrix(0, nrow=4, ncol=w))
+
+
+#expectation of the set of nucleotide bases at position i of the 
+#TFBSs given the indicator; gamma = 1 (letter count for motif if
+#it were to start at position i)
+#---------------------------------------------------------------
+  for(i in 1:w){
+  
+    for(k in 1:K){
+    
+      for(l in 1:L.prime){
+      
+      
+      
+        var1[l,]=(w.kl.mat[k,l]/W.K[k])*h2(genome1[k,l+i-1])
+      
+      }
+    
+    var2[k,]=colSums(var1)
+    
+    }
+  
+  Expected.Mgamma[,i]=colSums(var2)
+  }
+#----------------------------------------------------------------
+#Expectation (letter counts) of the set of all non-site bases
+
+Expected.Bgamma=NULL
+var3=as.data.frame(matrix(0, nrow=K, ncol = 4))
+
+  for(j in 1:K){
+  
+    var3[j, ]=h(genome1[j,])
+  
+  }
+
+Expected.Bgamma=colSums(var3)-rowSums(Expected.Mgamma)
+
+
+#_______________________________M-Step____________________________________
+
+#MLE for the probability vector of non-site nucleotide bases
+theta.new0=Expected.Bgamma/((dim(genome1)[2]-w)*K)
+#MLE for the probability matrix of the motif 
+theta.motif=Expected.Mgamma/K
+
+#update while loop conditional
+test=max(abs(theta.0.old-theta.new0))
+if(verbose==TRUE){print(paste("difference between previous NS vector and current",test, sep = "="))}
+
+
+#set new parameters
+theta.all=cbind.data.frame(theta.new0, theta.motif)
+
+parameter.mat[[q]]=theta.all
+q=q+1
+steps.to.converge=q
+
+#--------------------------------------------------------------------------
+
+
+  }
+
+  locs=as.data.frame(matrix(0, nrow=K, ncol = L.prime))
+  for(l in 1:dim(w.kl.mat)[1]){
+    locs[l,]=ifelse(w.kl.mat[l,]==max(w.kl.mat[l,]), 1, 0)
+  }
+
+
+
+return(list(MLE.motif=theta.motif, MLE.NS=theta.new0, prob.locations=w.kl.mat, 
+            locations=locs, steps=steps.to.converge, parameter.iters=parameter.mat))
+
+
+
+}
+
+
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+#initialization
+n=200
+set.seed=(567)
+genome1=gen.seq(n, uniform.probs = FALSE, c(0.3, 0.6, 0.9, 1), K=10)
+
+
+theta.0=c(0.7, 0.1, 0.15, 0.05)
+
+p1=c(0.1, 0.1, 0.2, 0.6)
+p2=c(0.1, 0.1, 0.4, 0.4)
+p3=c(0.4, 0.1, 0.1, 0.4)
+p4=c(0.7, 0.1, 0.1, 0.1)
+p5=c(0.2, 0.1, 0.6, 0.1)
+p6=c(0.3, 0.3, 0.3, 0.1)
+w=6
+#theta.all=cbind(theta.0, p1, p2, p3, p4)
+theta.all=cbind(theta.0, p1, p2, p3, p4, p5, p6)
+
+starting.params=cbind(c(0.3, 0.3, 0.3, .1),theta.all)
+colnames(starting.params)=c("True NS freq:","theta_0:", as.character(c(1:w)))
+row.names(starting.params)=c("A","T","C","G")
+library(knitr)
+kable(starting.params, caption="initialization values for parameters for motifs of size w=6. column 1 contains the true frequncy of the non-site regions " )
+
+
+XX=SMD.EM(gene.mat = genome1, start.prob.mat = theta.all, motif.len = w, verbose = FALSE)
+
+output=cbind.data.frame(XX$MLE.NS, XX$MLE.motif)
+colnames(output)=c("Theta_0","Theta1","Theta2","Theta3","Theta4","Theta5","Theta6")
+row.names(starting.params)=c("A","T","C","G")
+kable(output, caption="Example output from a single run of the EM with L=200, w=6, and K=10 sequences to show that the algorithm works (Compare Theta_0 to the true proportions of the bases in Table 1 )", digits = 4)
+
+
+
+```
+
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+#SMDEM@
+SMD.EM2=function(gene.mat=NULL, start.prob.mat=NULL, motif.len=NULL, verbose=TRUE, iterations=NULL){
+#initialize
+  genome1=gene.mat
+  theta.all=start.prob.mat
+  w=motif.len
+  #setting indicies
+  L.prime=dim(genome1)[2]-w+1
+  K=dim(genome1)[1]
+  
+  steps.to.converge=NULL
+  q=1
+  parameter.mat=list()
+  #intial test value
+  test=1
+  
+  for(i in 1:iterations){
+    theta.0.old=theta.all[,1]
+    
+#==============================EM======================================
+#_____________________________E-step___________________________________
+#function to calculate start location probabilities
+w.kl.mat=calc.prob.w(genome1, w, theta.all) 
+W.K=apply(w.kl.mat, 1, sum)
+#space allocation
+var1=as.data.frame(matrix(0, nrow = L.prime, ncol = 4))
+var2=as.data.frame((matrix(0, nrow = K, ncol = 4)))
+Expected.Mgamma=as.data.frame(matrix(0, nrow=4, ncol=w))
+
+
+#expectation of the set of nucleotide bases at position i of the 
+#TFBSs given the indicator; gamma = 1 (letter count for motif if
+#it were to start at position i)
+#---------------------------------------------------------------
+  for(i in 1:w){
+  
+    for(k in 1:K){
+    
+      for(l in 1:L.prime){
+      
+      
+      
+        var1[l,]=(w.kl.mat[k,l]/W.K[k])*h2(genome1[k,l+i-1])
+      
+      }
+    
+    var2[k,]=colSums(var1)
+    
+    }
+  
+  Expected.Mgamma[,i]=colSums(var2)
+  }
+#----------------------------------------------------------------
+#Expectation (letter counts) of the set of all non-site bases
+
+Expected.Bgamma=NULL
+var3=as.data.frame(matrix(0, nrow=K, ncol = 4))
+
+  for(j in 1:K){
+  
+    var3[j, ]=h(genome1[j,])
+  
+  }
+
+Expected.Bgamma=colSums(var3)-rowSums(Expected.Mgamma)
+
+
+#_______________________________M-Step____________________________________
+
+#MLE for the probability vector of non-site nucleotide bases
+theta.new0=Expected.Bgamma/((dim(genome1)[2]-w)*K)
+#MLE for the probability matrix of the motif 
+theta.motif=Expected.Mgamma/K
+
+#update while loop conditional
+test=max(abs(theta.0.old-theta.new0))
+if(verbose==TRUE){print(paste("difference between previous NS vector and current",test, sep = "="))}
+
+
+#set new parameters
+theta.all=cbind.data.frame(theta.new0, theta.motif)
+
+parameter.mat[[q]]=theta.all
+q=q+1
+steps.to.converge=q
+
+#--------------------------------------------------------------------------
+
+
+  }
+
+  locs=as.data.frame(matrix(0, nrow=K, ncol = L.prime))
+  for(l in 1:dim(w.kl.mat)[1]){
+    locs[l,]=ifelse(w.kl.mat[l,]==max(w.kl.mat[l,]), 1, 0)
+  }
+
+
+
+return(list(MLE.motif=theta.motif, MLE.NS=theta.new0, prob.locations=w.kl.mat, 
+            locations=locs, steps=steps.to.converge, parameter.iters=parameter.mat))
+
+
+
+}
+
+
+```
+
+
+
+
+
+```{r, fig.cap="Average model convergence times in seconds for increasing K and fixed length of 100 bp. Convergence time is linearly related to the number of sequences which is one of the nice properties of this algorithm. Initialization values are the same as those given in Table 1. ", echo=FALSE, warning=FALSE, message=FALSE}
+
+
+
+
+KK=seq(5,30, 5)
+iters=length(KK)
+time.to.converge=matrix(0, nrow = 10, ncol=iters)
+seeds=matrix(0, nrow = 10, ncol=iters)
+
+for(i in 1:iters){
+#initialization
+n=100
+r=round(runif(10, 0, 900))
+seeds[,i]=r
+
+storage1=NULL
+
+theta.0=c(0.7, 0.1, 0.15, 0.05)
+
+p1=c(0.1, 0.1, 0.2, 0.6)
+p2=c(0.1, 0.1, 0.4, 0.4)
+p3=c(0.4, 0.1, 0.1, 0.4)
+p4=c(0.7, 0.1, 0.1, 0.1)
+p5=c(0.2, 0.1, 0.6, 0.1)
+p6=c(0.3, 0.3, 0.3, 0.1)
+w=6
+#theta.all=cbind(theta.0, p1, p2, p3, p4)
+theta.all=cbind(theta.0, p1, p2, p3, p4, p5, p6)
+
+  for(j in 1:10){
+    
+    
+    set.seed(seeds[j])
+  
+    genome1=gen.seq(n, uniform.probs = FALSE, c(0.3, 0.6, 0.9, 1), K=KK[i], seed = seeds[j,i])
+  
+    start.time=Sys.time()
+    XX=SMD.EM(gene.mat = genome1, start.prob.mat = theta.all, motif.len = w, verbose = FALSE)
+    end.time=Sys.time()
+    storage1[j]=as.numeric(end.time-start.time)
+    
+  
+
+  }
+
+
+time.to.converge[,i]=storage1
+
+}
+
+
+
+
+
+plot(KK, colMeans(time.to.converge), type = "b", col="lightblue", lwd=2.5, pch=15, 
+     main = "Converge time of the EM application for sequence-matrices of increasing K each of length=100",
+     xlab = "K",
+     ylab = "Time in seconds")
+
+
+```
+
+
+
+```{r, fig.cap="Convergence of EM algorithm for genetic data with the true non-site probabilities given in Table 1 and with initial guess values of A=0.8, T=0.1, C=0.15, and G=0.05. This example shows the length of convergence when inital guess are \"far\" from the true non-site probabilities. The true site parameters are unknown and thus not compared in this example", echo=FALSE, warning=FALSE, message=FALSE}
+
+n=200
+true1=c(0.3, 0.3, 0.3, 0.1)
+genome1=gen.seq(n, uniform.probs = FALSE, cumsum(true1), K=10, seed = 568)
+
+
+theta.0=c(0.7, 0.1, 0.18, 0.02)
+
+p1=c(0.1, 0.1, 0.2, 0.6)
+p2=c(0.1, 0.1, 0.4, 0.4)
+p3=c(0.4, 0.1, 0.1, 0.4)
+p4=c(0.7, 0.1, 0.1, 0.1)
+p5=c(0.2, 0.1, 0.6, 0.1)
+p6=c(0.3, 0.3, 0.3, 0.1)
+w=6
+#theta.all=cbind(theta.0, p1, p2, p3, p4)
+theta.all=cbind(theta.0, p1, p2, p3, p4, p5, p6)
+
+
+its=40
+XX=SMD.EM2(gene.mat = genome1, start.prob.mat = theta.all, motif.len = w, verbose = FALSE, iterations=its)
+data.out=matrix(0, nrow=4, ncol=its)
+
+
+for(i in 1:its){
+  
+  data.out[,i]=XX$parameter.iters[[i]][,1]
+  
+}
+
+
+
+set.seed(22)
+cols.p=hcl.colors(10, "blues", alpha = 1)
+nam=c("A","T","C","G")
+
+par(mfrow=c(2,2))
+for(i in 1:4){
+  plot(c(1:its), data.out[i,], type = "b", col=cols.p[i], lwd=2.5, pch=15,
+     xlab = "Iterations",
+     ylab = "parameter value",
+     main = paste("convergence of model parameters for a motif of w=6 and l=200" ),
+     sub = paste("Theta_0|",nam[i], sep = ""))
+  
+}
+par(mfrow=c(1,1))
+
+```
+
+
+
+
+
+
+
+```{r, fig.cap="Non-site sequence parameter estimates at each iteration for CRP binding site data with w=19 bp site length and total length of 114 bp. initialization values were A=0.1, T=0.25, C=0.35, G=0.3. Model was run unitl convergence of absolute difference between estimates = 5e^-06 ", echo=FALSE, warning=FALSE, message=FALSE}
+#test against the Stormo-Hartzell CRP binding site data
+CRP=read.csv(file = "C:/Users/Bruin/Desktop/GS Academia/SEM 3/STAT 565 Comp. Intensive/565 project/CRPbindingSites.csv", header = FALSE)
+colnames(CRP)=c("SITE", c(2:length(CRP[1,])))
+library(knitr)
+kable(CRP, caption="23 verified cyclic adenosine monophosphate receptor protein (CRP) binding sites in E.coli taken from Stormo and Hartzell (1989) to test the ability of the algorithm to identify the parameters and the locations of each motif")
+ronam=CRP[,1]
+CRP=CRP[,-1]
+row.names(CRP)=ronam
+
+idx=dim(CRP)
+
+n=95
+true1=c(0.3, 0.3, 0.3, 0.1)
+genome1=gen.seq(n, uniform.probs = FALSE, cumsum(true1), K=idx[1], seed = 98)
+
+r=round(runif(idx[1], 0, 95))
+
+CRP.genome=as.data.frame(matrix(0, nrow=idx[1], ncol=(95+19) ))
+CRP.positions=as.data.frame(matrix(0, nrow=idx[1], ncol=(95+19) ))
+
+for(i in 1:idx[1]){
+  
+  CRP.genome[i,]=cbind(genome1[i,1:r[i]], CRP[i,], genome1[i,(r[i]+1):95])
+  CRP.positions[i,(r[i]+1)]=1
+  
+}
+
+
+
+#initialize
+theta.0=c(0.1, 0.25, 0.35, 0.3)
+p1=c(0.1, 0.1, 0.2, 0.6)
+p2=c(0.1, 0.1, 0.4, 0.4)
+p3=c(0.4, 0.1, 0.1, 0.4)
+p4=c(0.7, 0.1, 0.1, 0.1)
+p5=c(0.2, 0.1, 0.6, 0.1)
+p6=c(0.3, 0.3, 0.3, 0.1)
+p7=c(0.1, 0.5, 0.2, 0.2)
+p8=c(0.3, 0.2, 0.3, 0.2)
+p9=c(0.05, 0.05, 0.3, 0.6)
+p10=c(0.4, 0.3, 0.3, 0.1)
+p11=c(0.3, 0.1, 0.4, 0.2)
+p12=c(0.2, 0.3, 0.3, 0.2)
+p13=c(0.5, 0.3, 0.1, 0.1)
+p14=c(0.3, 0.4, 0.2, 0.1)
+p15=c(0.1, 0.2, 0.3, 0.4)
+p16=c(0.3, 0.3, 0.3, 0.1)
+p17=c(0.3, 0.1, 0.5, 0.1)
+p18=c(0.1, 0.3, 0.5, 0.1)
+p19=c(0.7, 0.1, 0.1, 0.1)
+#motif length
+w=19
+#set paramters
+theta.all=cbind(theta.0, p1, p2, p3, p4, p5, p6, p7, p8, p9,
+                p10, p11, p12, p13, p14, p15, p16, p17, p18, p19)
+
+
+#run
+XX=SMD.EM(gene.mat = CRP.genome, start.prob.mat = theta.all, motif.len = w, verbose = FALSE, conv.cond = 0.000005)
+
+#post-processing:
+#initialization:
+pos.est=NULL
+pos.act=NULL
+true.freq.i=as.data.frame(matrix(0, nrow=4, ncol=idx[2]))
+#get actual and estimate CRP binding site row-positions in matrix
+for(i in 1:idx[1]){
+  pos.est[i]=match(1, XX$locations[i,])
+  pos.act[i]=match(1, CRP.positions[i,])
+}
+#get true CRP frequencies
+for(i in 1:idx[2]){
+  
+  var=summary(factor(CRP[,i]))/idx[1]
+  var2=rep(0,4)
+  
+  if(length(var)<=3){
+
+      letters1=colnames(var)
+      letters2=c("A","T","C","G")
+      
+      var2=ifelse(letters2==letters1, var, 0)
+      
+      true.freq.i[,i]=var2
+    
+  }else{ true.freq.i[,i]=var}
+  
+}
+
+table.info1=cbind(true1, true.freq.i[,1:3], XX$MLE.NS, XX$MLE.motif[1:3])
+colnames(table.info1)=cbind(c("TRUE.NS","True1","True2","True3"), c("EST.NS", "Est1", "Est2", "Est3"))
+row.names(table.info1)=c("A","T","C","G")
+kable(table.info1, caption = "table to for comparison of true CRP site and non-site (NS) parameters and their estimates from the EM model at convergence. data is given for NS frequencies (column 1 and 4) and first 3 site positions",
+      digits = 4)
+
+table.info2=cbind(pos.act, pos.est, pos.act-pos.est)
+colnames(table.info2)=c("act.CRP.Positions", "Est.CRP.Positions", "difference")
+row.names(table.info2)=ronam
+
+kable(table.info2, caption="actual and predicted CRP binding site positions retained from EM model at convergence")
+
+wilcox.test(pos.act, pos.est, alternative = c("two.sided"), paired = TRUE)
+
+#plot result
+data.out=matrix(0, nrow=4, ncol=length(XX$parameter.iters))
+
+
+for(i in 1:length(XX$parameter.iters)){
+  
+  data.out[,i]=XX$parameter.iters[[i]][,1]
+  
+}
+
+
+
+set.seed(22)
+cols.p=hcl.colors(10, "blues", alpha = 1)
+nam=c("A","T","C","G")
+
+par(mfrow=c(2,2))
+for(i in 1:4){
+  plot(c(1:length(XX$parameter.iters)), data.out[i,], type = "b", col=cols.p[i], lwd=2.5, pch=15,
+     xlab = "Iterations",
+     ylab = "parameter value",
+     main = paste("convergence of model parameters of w=19 and Length=114 bp" ),
+     sub = paste("Theta_0|",nam[i], sep = ""))
+  
+}
+par(mfrow=c(1,1))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+\section*{References:}
+
