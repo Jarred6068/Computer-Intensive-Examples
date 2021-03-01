@@ -1,14 +1,4 @@
 
-
-
-
-
-#suppose we have x1.....xn ~ Exp(Lambda) and they are iid
-#then the MLE of lambda = 1/xbar
-#thus the MLE is dependent on the dataset that we observe!
-
-
-
 #by newton raphson algorithm 
 
 #initialize data
