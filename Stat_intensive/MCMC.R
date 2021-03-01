@@ -1,3 +1,7 @@
+#NOTICE of INTELLECTUAL PROPERTY: The following code was shared with the 
+#STAT 565 class of 2020 as an example of the MCMC algorithm. The original Developer and owner of 
+#the following code is Dr. Audrey Fu of the University of Idaho - Department of Mathematics and Statistical Science
+
 #############################################################
 # Implement an MH algorithm to sample from Beta(alpha, beta)
 # using uniforms as the proposal distribution
