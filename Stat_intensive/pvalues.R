@@ -1,3 +1,8 @@
+#NOTICE of INTELLECTUAL PROPERTY: The following code was shared with the 
+#STAT 565 class of 2020 as an example of Random Number Generation (RNG). The original Developer and owner of 
+#the following code is Dr. Audrey Fu of the University of Idaho - Department of Mathematics and Statistical Science
+
+
 # Function to generate p-values under the null hypothesis
 #
 # Input
